@@ -7,6 +7,7 @@
 #include <TMath.h>
 #include <TLatex.h>
 #include <TStyle.h>
+#include <TEllipse.h>
 
 int main(){
 
@@ -78,10 +79,10 @@ int main(){
     while(file2 >> azInit >> zdInit >> azFinal >> zdFinal ){
         StartPointsAz.push_back((azInit+90) *toRad);
         StartPointsZd.push_back(90 - zdInit);
-        EndPointsAz.push_back((azInit+90) *toRad);
+        EndPointsAz.push_back((azFinal+90) *toRad);
         EndPointsZd.push_back(90 - zdFinal);
         AzProjAll.push_back((azInit+90) *toRad);
-        AzProjAll.push_back((azInit+90) *toRad);
+        AzProjAll.push_back((azFinal+90) *toRad);
         ZdProjAll.push_back(90 - zdInit);
         ZdProjAll.push_back(90 - zdFinal);
     }
@@ -92,7 +93,6 @@ int main(){
     for(unsigned long int i=0; i<AzProjAll.size(); i++){
         AzProjGraph[i] = AzProjAll[i];
         ZdProjGraph[i] = ZdProjAll[i];
-        std::cout << AzProjGraph[i] << "=" << AzProjAll[i] <<  std::endl;
     }
 
 
@@ -105,6 +105,76 @@ int main(){
     gr2.SetMaxRadial(90);
     gr2.SetMarkerSize(1.5);
     gr2.Draw("P SAME");
+
+    double CelestialPoleX = 0;
+    double CelestialPoleY = 44.5892595; //Latitude of the observatory :)
+    double StarX = 0;
+    double StarY = 0;
+
+    for (size_t i = 0; i < StartPointsAz.size(); ++i) {
+        StarX = -( StartPointsZd[i] * TMath::Cos(StartPointsAz[i]) - CelestialPoleX );
+        StarY = StartPointsZd[i] * TMath::Sin(StartPointsAz[i]) - CelestialPoleY;
+        std::cout << "X " << StarX << ", Y " << StarY << std::endl; 
+
+        double CurrX = StarX;
+        double CurrY = StarY;
+        double NextX = CurrX;
+        double NextY = CurrY;
+        double RealY;
+        const int nPoints = 100000;
+        double step = 0.1;
+        
+        double angle[nPoints];
+        double radius[nPoints];
+        for(int j = 0; j < nPoints; ++j){
+            if(CurrX > 0 && CurrY > 0){
+                NextX = CurrX - step;
+                NextY = TMath::Sqrt(CurrX*CurrX + CurrY*CurrY - NextX*NextX);
+                CurrX = NextX;
+                CurrY = NextY;
+                RealY = CurrY + CelestialPoleY;
+
+                radius[j] = TMath::Sqrt(CurrX*CurrX + RealY*RealY);
+                angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
+            }
+            if(CurrX < 0 && CurrY > 0){
+                NextY = CurrY - step;
+                NextX = -TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextY*NextY);
+                CurrX = NextX;
+                CurrY = NextY;
+                RealY = CurrY + CelestialPoleY;
+
+                radius[j] = TMath::Sqrt(CurrX*CurrX + RealY*RealY);
+                angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
+            }
+            if(CurrX > 0 && CurrY < 0){
+                NextY = CurrY + step;
+                NextX = TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextY*NextY);
+                CurrX = NextX;
+                CurrY = NextY;
+                RealY = CurrY + CelestialPoleY;
+
+                radius[j] = TMath::Sqrt(CurrX*CurrX + RealY*RealY);
+                angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
+            }
+            if(CurrX < 0 && CurrY < 0){
+                NextX = CurrX + step;
+                NextY = -TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextX*NextX);
+                CurrX = NextX;
+                CurrY = NextY;
+                RealY = CurrY + CelestialPoleY;
+
+                radius[j] = TMath::Sqrt(CurrX*CurrX + RealY*RealY);
+                angle[j] = std::atan2(RealY, CurrX) + 90*toRad;
+            }
+        }
+        TGraphPolar *circle = new TGraphPolar(nPoints, angle, radius);
+        circle->SetPolargram(polarFrame);
+        circle->SetLineColor(kRed);
+        circle->Draw("L SAME"); // "L" = line connecting points
+
+    }
+
     
     c1.Update();
     app.Run();
