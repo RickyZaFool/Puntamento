@@ -9,6 +9,34 @@
 #include <TStyle.h>
 #include <TEllipse.h>
 
+
+std::string LabelsPolarTextual[24] = {
+    "N",
+    "15",
+    "30",
+    "NE",
+    "60",
+    "75",
+    "E",
+    "105",
+    "120",
+    "SE",
+    "150",
+    "165",
+    "S",
+    "195",
+    "210",
+    "SW",
+    "240",
+    "255",
+    "W",
+    "285",
+    "300",
+    "NW",
+    "330",
+    "345"
+};
+
 int main(){
 
     auto pi = TMath::Pi();
@@ -20,19 +48,36 @@ int main(){
     TCanvas c1;
     auto polarFrame = new TGraphPolargram("polarFrame", 0, 360*toRad, 0, 90);
     polarFrame->SetToRadian();
+    polarFrame->SetNdivRadial(9);
+    polarFrame->SetNdivPolar(24);
     polarFrame->Draw("P SAME");
     polarFrame->SetPolarLabelSize(0);
-    double r = 1.1; // Relative radius (between 0 and 1)
-    double angle_deg = 90; // Angle where you want label (90 = top after offset)
-    double x = r * TMath::Cos(angle_deg * TMath::Pi() / 180.0);
-    double y = r * TMath::Sin(angle_deg * TMath::Pi() / 180.0);
 
-    TLatex *northLabel = new TLatex(x, y, "N");
-    northLabel->SetTextAlign(22); // Center align
-    northLabel->SetTextSize(0.05);
-    northLabel->Draw();
-    
-    
+    double r = 1.1; // Relative radius (between 0 and 1)
+    double base_angle = 90;
+
+    int PolarDivs = polarFrame->GetNdivPolar();
+    int RadialDivs = polarFrame->GetNdivRadial();
+    double angle_deg = 360.0/PolarDivs; // Each div
+
+    for(int i = 0; i<PolarDivs; i++){
+        double x = r * TMath::Cos((base_angle + i * angle_deg) * TMath::Pi() / 180.0);
+        double y = r * TMath::Sin((base_angle + i * angle_deg) * TMath::Pi() / 180.0);
+        TLatex *Label = new TLatex(x, y, LabelsPolarTextual[i].c_str());
+        Label->SetTextAlign(22); // Center align
+        Label->SetTextSize(0.05);
+        Label->Draw();
+    }
+
+    for(int i = 0; i<RadialDivs; i++){
+        double y = (i+1) * 0.1 + 0.0125*i;
+        double x = 0;
+        TLatex *Label = new TLatex(x, y, std::to_string((i+1)*10).c_str());
+        Label->SetTextAlign(25); // Center align
+        Label->SetTextSize(0.02);
+        Label->Draw();
+    }
+
     std::ifstream file("taken.dat");
     std::ifstream file2("predicted.dat");
 
@@ -121,15 +166,15 @@ int main(){
         double NextX = CurrX;
         double NextY = CurrY;
         double RealY;
-        const int nPoints = 100000;
-        double step = 0.1;
+        const int nPoints = 25000;
+        double step = 0.001;
         
         double angle[nPoints];
         double radius[nPoints];
         for(int j = 0; j < nPoints; ++j){
             if(CurrX > 0 && CurrY > 0){
-                NextX = CurrX - step;
-                NextY = TMath::Sqrt(CurrX*CurrX + CurrY*CurrY - NextX*NextX);
+                NextY = CurrY - step;
+                NextX = TMath::Sqrt(CurrX*CurrX + CurrY*CurrY - NextY*NextY);
                 CurrX = NextX;
                 CurrY = NextY;
                 RealY = CurrY + CelestialPoleY;
@@ -138,8 +183,8 @@ int main(){
                 angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
             }
             if(CurrX < 0 && CurrY > 0){
-                NextY = CurrY - step;
-                NextX = -TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextY*NextY);
+                NextX = CurrX + step;
+                NextY = TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextX*NextX);
                 CurrX = NextX;
                 CurrY = NextY;
                 RealY = CurrY + CelestialPoleY;
@@ -148,8 +193,8 @@ int main(){
                 angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
             }
             if(CurrX > 0 && CurrY < 0){
-                NextY = CurrY + step;
-                NextX = TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextY*NextY);
+                NextX = CurrX - step;
+                NextY = -TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextX*NextX);
                 CurrX = NextX;
                 CurrY = NextY;
                 RealY = CurrY + CelestialPoleY;
@@ -158,14 +203,14 @@ int main(){
                 angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
             }
             if(CurrX < 0 && CurrY < 0){
-                NextX = CurrX + step;
-                NextY = -TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextX*NextX);
+                NextY = CurrY + step;
+                NextX = - TMath::Sqrt(CurrY*CurrY + CurrX*CurrX - NextY*NextY);
                 CurrX = NextX;
                 CurrY = NextY;
                 RealY = CurrY + CelestialPoleY;
 
                 radius[j] = TMath::Sqrt(CurrX*CurrX + RealY*RealY);
-                angle[j] = std::atan2(RealY, CurrX) + 90*toRad;
+                angle[j] = std::atan2(CurrX, RealY) + 90*toRad;
             }
         }
         TGraphPolar *circle = new TGraphPolar(nPoints, angle, radius);
