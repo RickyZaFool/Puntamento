@@ -159,7 +159,6 @@ int main(){
     for (size_t i = 0; i < StartPointsAz.size(); ++i) {
         StarX = -( StartPointsZd[i] * TMath::Cos(StartPointsAz[i]) - CelestialPoleX );
         StarY = StartPointsZd[i] * TMath::Sin(StartPointsAz[i]) - CelestialPoleY;
-        std::cout << "X " << StarX << ", Y " << StarY << std::endl; 
 
         double CurrX = StarX;
         double CurrY = StarY;
