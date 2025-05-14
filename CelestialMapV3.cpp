@@ -7,6 +7,120 @@
 #include <TMath.h>
 #include <TLatex.h>
 #include <TStyle.h>
+#include <cmath>
+#include <ctime>
+
+//Useful variables and conversions
+auto pi = TMath::Pi();
+double degToRad = pi / 180;
+
+
+//JDN calculation
+long JDN(int y, int m, int d) {
+    if (m <= 2) {
+        y -= 1;
+        m += 12;
+    }
+    return (1461 * (y + 4800)) / 4
+         + (367 * (m - 2)) / 12
+         - (3 * ((y + 4900) / 100)) / 4
+         + d - 32075;
+}
+
+bool is_last_sunday(int year, int month, int day) {
+    std::tm timeinfo = {};
+    timeinfo.tm_year = year - 1900;
+    timeinfo.tm_mon = month - 1;
+    timeinfo.tm_mday = day;
+
+    std::mktime(&timeinfo); // Normalize timeinfo to get weekday
+    int weekday = timeinfo.tm_wday;
+
+    // Find the last day of the month
+    int last_day;
+    if (month == 2) {
+        // Leap year check
+        bool leap = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+        last_day = leap ? 29 : 28;
+    } else if (month == 4 || month == 6 || month == 9 || month == 11) {
+        last_day = 30;
+    } else {
+        last_day = 31;
+    }
+
+    return weekday == 0 && day + 7 > last_day;
+}
+
+bool is_dst_italy(int year, int month, int day, int hour) {
+    // Find DST start: last Sunday of March at 02:00
+    // Find DST end: last Sunday of October at 03:00
+
+    if (month < 3 || month > 10) return false;
+    if (month > 3 && month < 10) return true;
+
+    if (month == 3) {
+        // March: check if it's after the last Sunday at 02:00
+        std::tm t = {};
+        for (int d = 31; d >= 25; --d) {
+            if (is_last_sunday(year, 3, d)) {
+                if (day > d) return true;
+                if (day == d && hour >= 2) return true;
+                return false;
+            }
+        }
+    }
+
+    if (month == 10) {
+        // October: check if it's before the last Sunday at 03:00
+        std::tm t = {};
+        for (int d = 31; d >= 25; --d) {
+            if (is_last_sunday(year, 10, d)) {
+                if (day < d) return true;
+                if (day == d && hour < 3) return true;
+                return false;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+double local_sidereal_time(double jd, double longitude) {
+    // Step 1: Julian Century (T)
+    double T = (jd - 2451545.0) / 36525.0;
+
+    // Step 2: Greenwich Mean Sidereal Time (GMST) in degrees
+    double GMST = 280.46061837 + 360.98564736629 * (jd - 2451545.0) + 
+                  T * T * 0.000387933 - T * T * T / 38710000;
+    
+    // Make sure GMST is within 0 to 360 degrees
+    GMST = fmod(GMST, 360.0);
+
+    // Step 3: Convert GMST to Local Sidereal Time (LST) in degrees
+    double LST = GMST + longitude;
+    
+    // Step 4: Adjust LST to be within 0 to 360 degrees
+    LST = fmod(LST, 360.0);
+    if (LST < 0) {
+        LST += 360.0;
+    }
+
+    return LST;
+}
+
+double calculateAltitude(double latitude, double declination, double hourAngle){
+    double alt = TMath::ASin(TMath::Sin(latitude * degToRad)*TMath::Sin(declination * degToRad) + TMath::Cos(latitude * degToRad)*TMath::Cos(declination * degToRad)*TMath::Cos(hourAngle * degToRad));
+    return alt / degToRad;
+} 
+
+double calculateAzimuth(double declination, double hourAngle, double altitude, double latitude){
+    double sinAz = -TMath::Sin(hourAngle * degToRad) * TMath::Cos(declination * degToRad);
+    double cosAz = -(TMath::Cos(hourAngle * degToRad) * TMath::Cos(declination * degToRad) * TMath::Sin(latitude * degToRad) - TMath::Sin(declination * degToRad) * TMath::Cos(latitude * degToRad));
+    double azimuth = atan2(sinAz, cosAz);
+
+    return azimuth;
+}
 
 std::string LabelsPolarTextual24Divs[24] = {
     "N",
@@ -36,9 +150,7 @@ std::string LabelsPolarTextual24Divs[24] = {
 };
 
 int main(){
-	//Useful variables and conversions
-	auto pi = TMath::Pi();
-    double degToRad = pi / 180;
+
     
     //NOTE! The ROOT standard for polar graphing has north to the right.
     //Thus, the Azimuth 0 is parallel to positive X in ROOT's internal system.
@@ -142,29 +254,22 @@ int main(){
     
     //Prediction processing
     
-    double RaH = 0, RaM = 0, RaS = 0, DecD = 0, DecM = 0, DecS = 0, startTime = 0, endTime = 0, day = 0, month = 0, year = 0;
-    vector<double> raList(0);
-    vector<double> decList(0);
-    vector<double> startTimeList(0);
-    vector<double> endTimeList(0);
+    double RaH = 0, RaM = 0, RaS = 0, DecD = 0, DecM = 0, DecS = 0, startTime = 0, endTime = 0;
+    int day = 0, month = 0, year = 0;
+    std::vector<double> raList(0);
+    std::vector<double> decList(0);
+    std::vector<double> startTimeList(0);
+    std::vector<double> endTimeList(0);
     predictedFile >> day >> month >> year;
     
-    double JDN = std::floor(1461*(year + 4800 + stf::floor((month - 14)/12))/4) + std::floor(367*(month - 2 - 12 * std::floor((month-14)/12))/12) - std::floor(3*(std::floor((year + 4900 + std::floor((month-14)/12))/100))/4) + day - 32075;
+    long jdn = JDN(year, month, day);
+    std::vector<double> JDList;
+
+    std::vector<double> AzPredictedList(0);
+    std::vector<double> ZdPredictedList(0);
     
-    double legal;
-    if(){
-    	legal = 1;
-    }
-    else{
-    	legal = 2;
-    }
-    
-    double UT = hour + legal;
-    
-    double JD = 
-    
-    while(predictedFile >> Rah >> RaM >> RaS >> DecH >> DecM >> DecS >> startTime >> endTime ){
-    	double raInDec = (Rah + RaM / 60 + RaS / 3600)*15;
+    while(predictedFile >> RaH >> RaM >> RaS >> DecD >> DecM >> DecS >> startTime >> endTime ){
+    	double raInDec = (RaH + RaM / 60 + RaS / 3600)*15;
     	double decInDec = DecD + DecM / 60 + DecS / 3600;
     	raList.push_back(raInDec);
     	decList.push_back(decInDec);
@@ -172,48 +277,88 @@ int main(){
     	double startMinutes = (startTime - startHour) * 100;
     	double endHour = std::floor(endTime);
     	double endMinutes = (endTime - endHour) * 100;
+        double currJdn = jdn;
+        int legal;
+        if(is_dst_italy(year, month, day, startHour)){
+            legal = -2;
+        }else{
+            legal = -1;
+        }
+        startHour += legal;
+        if(startHour < 0){
+            startHour += 24;
+            currJdn -= 1;
+        }
+        if(is_dst_italy(year, month, day, endHour)){
+            legal = -2;
+        }else{
+            legal = -1;
+        }
+        endHour += legal;
+        if(endHour < 0){
+            endHour += 24;
+        }
+
+        double JD = currJdn + (startHour - 12) / 24 + startMinutes / 1440;
+        JDList.push_back(JD);
     	startTimeList.push_back(startHour * 3600 + startMinutes  * 60);
 		endTimeList.push_back(endHour * 3600 + endMinutes * 60);
     }
     
-    int nSteps = 10000;
+    
+    int nSteps = 1000;
     
     for(unsigned long int i=0; i<startTimeList.size(); i++){
-    	for(int j = 0; j < nSteps; j++){
-    		
+        if(endTimeList[i] - startTimeList[i] < 0){
+            endTimeList[i] += 24 * 3600;
+        }
+        std::cout << endTimeList[i] << " " << startTimeList[i] << std::endl;
+        std::cout << (endTimeList[i] - startTimeList[i])/3600 << std::endl;
+
+    	double LST = local_sidereal_time(JDList[i],ObservatoryLongitude);
+        double hourAngle = LST - raList[i];
+        hourAngle = fmod(hourAngle, 360.0);
+        double altitude = calculateAltitude(CelestialPoleX , decList[i], hourAngle);
+        ZdPredictedList.push_back(90 - altitude);
+        double azimuthPredicted = calculateAzimuth(decList[i], hourAngle, altitude, CelestialPoleX);
+        AzPredictedList.push_back(azimuthPredicted  + directionOfNorth * degToRad);
+        for(int j = 0; j < nSteps; j++){
+    		double timePassed = (endTimeList[i] - startTimeList[i]) * double(j + 1) / nSteps;
+            LST = local_sidereal_time(JDList[i] + timePassed / 86400.0 , ObservatoryLongitude);
+            hourAngle = LST - raList[i];
+            altitude = calculateAltitude(CelestialPoleX, decList[i], hourAngle);
+            ZdPredictedList.push_back(90 - altitude);
+            azimuthPredicted = calculateAzimuth(decList[i], hourAngle, altitude, CelestialPoleX);
+            AzPredictedList.push_back(azimuthPredicted  + directionOfNorth * degToRad);
     	}
     }
     
-    
-    
-    
-    
-    
-    
-    
-    Double_t AzPredictedGraph[];  //Thanks, root
-    Double_t ZdPredictedGraph[];  //Thanks, root
+    Double_t AzPredictedGraph[AzPredictedList.size()];  //Thanks, root
+    Double_t ZdPredictedGraph[ZdPredictedList.size()];  //Thanks, root
+
+    for(unsigned long int i = 0; i < AzPredictedList.size(); i++){
+        AzPredictedGraph[i] = AzPredictedList[i];
+        ZdPredictedGraph[i] = ZdPredictedList[i];
+    }
 
 
-
-    
     //Graph of the start and end points
 
-    TGraphPolar gr2(predictionAzList.size(), AzPredictedGraph, ZdPredictedGraph);
+    TGraphPolar gr2(AzPredictedList.size(), AzPredictedGraph, ZdPredictedGraph);
     gr2.SetPolargram(polarFrame);
     gr2.SetMarkerStyle(29);
     gr2.SetMarkerColor(kRed);
+    gr2.SetLineColor(kRed);
     gr2.SetMinRadial(0);
     gr2.SetMaxRadial(90);
     gr2.SetMarkerSize(1.5);
-    gr2.Draw("P SAME");
+    gr2.Draw("L SAME");
     
     
     
     
     
-    
-    
+
     //ROOT graphing tool. THESE LINES MUST BE AT THE END OF THE PAGE ALWAYS.
     
     c1.Update();
