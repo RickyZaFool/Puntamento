@@ -60,7 +60,6 @@ bool is_dst_italy(int year, int month, int day, int hour) {
 
     if (month == 3) {
         // March: check if it's after the last Sunday at 02:00
-        std::tm t = {};
         for (int d = 31; d >= 25; --d) {
             if (is_last_sunday(year, 3, d)) {
                 if (day > d) return true;
@@ -72,7 +71,6 @@ bool is_dst_italy(int year, int month, int day, int hour) {
 
     if (month == 10) {
         // October: check if it's before the last Sunday at 03:00
-        std::tm t = {};
         for (int d = 31; d >= 25; --d) {
             if (is_last_sunday(year, 10, d)) {
                 if (day < d) return true;
@@ -265,8 +263,7 @@ int main(){
     long jdn = JDN(year, month, day);
     std::vector<double> JDList;
 
-    std::vector<double> AzPredictedList(0);
-    std::vector<double> ZdPredictedList(0);
+
     
     while(predictedFile >> RaH >> RaM >> RaS >> DecD >> DecM >> DecS >> startTime >> endTime ){
     	double raInDec = (RaH + RaM / 60 + RaS / 3600)*15;
@@ -307,8 +304,14 @@ int main(){
     
     
     int nSteps = 1000;
+
+    TGraphPolar grs[startTimeList.size()];
     
     for(unsigned long int i=0; i<startTimeList.size(); i++){
+
+        std::vector<double> AzPredictedList(0);
+        std::vector<double> ZdPredictedList(0);       
+
         if(endTimeList[i] - startTimeList[i] < 0){
             endTimeList[i] += 24 * 3600;
         }
@@ -331,28 +334,27 @@ int main(){
             azimuthPredicted = calculateAzimuth(decList[i], hourAngle, altitude, CelestialPoleX);
             AzPredictedList.push_back(azimuthPredicted  + directionOfNorth * degToRad);
     	}
-    }
-    
-    Double_t AzPredictedGraph[AzPredictedList.size()];  //Thanks, root
-    Double_t ZdPredictedGraph[ZdPredictedList.size()];  //Thanks, root
+        Double_t AzPredictedGraph[AzPredictedList.size()];  //Thanks, root
+        Double_t ZdPredictedGraph[ZdPredictedList.size()];  //Thanks, root
 
-    for(unsigned long int i = 0; i < AzPredictedList.size(); i++){
-        AzPredictedGraph[i] = AzPredictedList[i];
-        ZdPredictedGraph[i] = ZdPredictedList[i];
+        for(unsigned long int i = 0; i < AzPredictedList.size(); i++){
+            AzPredictedGraph[i] = AzPredictedList[i];
+            ZdPredictedGraph[i] = ZdPredictedList[i];
+        }
+        grs[i] = TGraphPolar(AzPredictedList.size(), AzPredictedGraph, ZdPredictedGraph);
+        grs[i].SetPolargram(polarFrame);
+        grs[i].SetLineColor(kRed);
+        grs[i].SetMinRadial(0);
+        grs[i].SetMaxRadial(90);
+        grs[i].SetLineWidth(1.7);
+        grs[i].Draw("L SAME");
+        c1.Update();
     }
 
 
     //Graph of the start and end points
 
-    TGraphPolar gr2(AzPredictedList.size(), AzPredictedGraph, ZdPredictedGraph);
-    gr2.SetPolargram(polarFrame);
-    gr2.SetMarkerStyle(29);
-    gr2.SetMarkerColor(kRed);
-    gr2.SetLineColor(kRed);
-    gr2.SetMinRadial(0);
-    gr2.SetMaxRadial(90);
-    gr2.SetMarkerSize(1.5);
-    gr2.Draw("L SAME");
+
     
     
     
