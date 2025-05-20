@@ -198,14 +198,26 @@ int main(){
     }
     
     //Labelling of radial division. 
-    //In the telescope system, 90 is the horizon. In stellarium, 0 is the orizon. TODO: Display both with corresponding labelling 
+    TLatex *LabelStellariumTitle = new TLatex (0.128, 1.05, "Stellarium");
+    LabelStellariumTitle->SetTextAlign(25);
+    LabelStellariumTitle->SetTextSize(0.02);
+    LabelStellariumTitle->Draw();
+    TLatex *LabelObservatoryTitle = new TLatex ( - 0.128, 1.05, "Obserbvatory");
+    LabelObservatoryTitle->SetTextAlign(25);
+    LabelObservatoryTitle->SetTextSize(0.02);
+    LabelObservatoryTitle->Draw();
     for(int i = 0; i<RadialDivs; i++){
         double y = (i+1) * 0.1 + 0.0125*i; //TODO: need better alignment, the division is non linear.
-        double x = 0;
-        TLatex *Label = new TLatex(x, y, std::to_string((i+1)*10).c_str());
-        Label->SetTextAlign(25);
-        Label->SetTextSize(0.02);
-        Label->Draw();
+        double xStellarium = 0.02 + 0.012 * i;
+        TLatex *LabelStellarium = new TLatex(xStellarium, y, std::to_string(90 - (i+1)*10).c_str());
+        LabelStellarium->SetTextAlign(25);
+        LabelStellarium->SetTextSize(0.02);
+        LabelStellarium->Draw();
+        double xObservatory = - (0.02 + 0.012 * i);
+        TLatex *LabelObservatory = new TLatex(xObservatory, y, std::to_string((i+1)*10).c_str());
+        LabelObservatory->SetTextAlign(25);
+        LabelObservatory->SetTextSize(0.02);
+        LabelObservatory->Draw();
     }
     
     //File handling
