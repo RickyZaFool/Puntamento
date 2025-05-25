@@ -361,17 +361,7 @@ int main(){
         grs[i].SetLineWidth(1.7);
         grs[i].Draw("L SAME");
         c1.Update();
-    }
-
-
-    //Graph of the start and end points
-
-
-    
-    
-    
-    
-    
+    }   
 
     //ROOT graphing tool. THESE LINES MUST BE AT THE END OF THE PAGE ALWAYS.
     
