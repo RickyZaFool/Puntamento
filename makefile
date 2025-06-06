@@ -3,13 +3,13 @@ CFLAGS     = --std=c++11 -g -Wall
 CFLAGSROOT = `root-config --cflags`
 LIBSROOT   = `root-config --glibs`
 
-all: CelestialMapV3
+all: CelestialMapV4
 
-CelestialMapV3: CelestialMapV3.cpp
-	$(CC) $(CFLAGS) -o CelestialMapV3 CelestialMapV3.cpp $(CFLAGSROOT) $(LIBSROOT)
+CelestialMapV4: CelestialMapV4.cpp
+	$(CC) $(CFLAGS) -o CelestialMapV4 CelestialMapV4.cpp $(CFLAGSROOT) $(LIBSROOT)
 
-Windows: CelestialMapV3.cpp
-	$(CC) $(CFLAGS) -o CelestialMapV3.exe CelestialMapV3.cpp $(CFLAGSROOT) $(LIBSROOT)
+Windows: CelestialMapV4.cpp
+	$(CC) $(CFLAGS) -o CelestialMapV4.exe CelestialMapV4.cpp $(CFLAGSROOT) $(LIBSROOT)
 
 clean:
 	rm *.o
